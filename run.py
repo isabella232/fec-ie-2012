@@ -1,39 +1,84 @@
 #!/usr/bin/env python
 
+import argparse
+import sys
+
 import csvkit
 
-header = []
-rows = []
-amended_ids = []
+class FEC(object):
+    """
+    Process FEC data dumps.
+    """
+    def __init__(self):
+        self.argparser = argparse.ArgumentParser(
+            description='A command line utility for processing FEC data dumps.'
+        )
 
-def filter_func(row):
-    if row[header.index('can_off')] != 'P':
-        return False
+        self.argparser.add_argument(
+            dest='input', action='store',
+            help='Path to input CSV.'
+        )
 
-    if row[header.index('file_num')] in amended_ids:
-        return False
+        self.argparser.add_argument(
+            dest='output', action='store',
+            help='Path to output CSV.'
+        )
 
-    return True
+        self.argparser.add_argument(
+            '-a', '--amendments',
+            dest='keep_amendments', action='store_true',
+            help='Keep amendments (instead of filtering them out).'
+        )
 
-def main():
-    global header
+        self.argparser.add_argument(
+            '-o', '--office',
+            dest='office', action='store',
+            help='Filter output only a certain office.'
+        )
 
-    with open('data.csv') as f:
-        reader = csvkit.reader(f)
-        header = reader.next()
-        rows = list(reader)
+        self.args = self.argparser.parse_args()
 
-    for row in rows:
-        if row[header.index('amn_ind')] != 'N':
-            amended_ids.append(row[header.index('prev_file_num')])
+        self.amended_ids = set()
 
-    output_rows = filter(filter_func, rows)
+        # Read input data
+        with open(self.args.input) as f:
+            reader = csvkit.reader(f)
+            self.header = reader.next()
+            rows = list(reader)
 
-    with open('output.csv', 'w') as f:
-        writer = csvkit.writer(f)
-        writer.writerow(header)
+        sys.stdout.write('Read %i rows\n' % len(rows))
 
-        writer.writerows(output_rows)
+        # Discover amendments
+        if not self.args.keep_amendments:
+            for row in rows:
+                if row[self.header.index('amn_ind')] != 'N':
+                    self.amended_ids.add(row[self.header.index('prev_file_num')])
+
+        # Filter data
+        output_rows = filter(self.filter_row, rows)
+
+        sys.stdout.write('Saving %i rows\n' % len(output_rows))
+
+        # Write output
+        with open(self.args.output, 'w') as f:
+            writer = csvkit.writer(f)
+            writer.writerow(self.header)
+
+            writer.writerows(output_rows)
+
+    def filter_row(self, row):
+        """
+        Filter an individual row based on arguments.
+        """
+        if self.args.office:
+            if row[self.header.index('can_off')] != self.args.office:
+                return False
+
+        if not self.args.keep_amendments:
+            if row[self.header.index('file_num')] in self.amended_ids:
+                return False
+
+        return True
 
 if __name__ == '__main__':
-    main()
+    FEC()

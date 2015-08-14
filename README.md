@@ -1,14 +1,25 @@
-### To use
+### Setup
+
+```
+mkvirtualenv fec-ie-2012
+pip install -r requirements.txt
+```
+
+### Usage
 
 ```
 cd fec-ie-2012
 workon fec-ie-2012
 ```
 
-Copy your FEC spreadsheet to ``fec-ie-2012/data.csv``
+Remove amendments and filter to president only:
 
 ```
-./run.py
+./run.py --office P input.csv output.csv
 ```
 
-Your output data is named ``output.csv``
+Keep amendments and filter to Senate only:
+
+```
+./run.py --office S --keep-amendments input.csv output.csv
+```
